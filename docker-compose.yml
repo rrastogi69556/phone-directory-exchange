@@ -1,0 +1,143 @@
+version: '3.7'
+services:
+  postgres-service:
+    image: postgres
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: postgres
+    networks:
+      - crm-network
+  
+  mock_pbx:
+    build: ./backend-assignment/mock_pbx
+    container_name: mock_pbx
+    ports:
+     - 3030:3030
+    networks:
+      - crm-network
+    
+  discovery-server:
+    build: ./discovery-server
+    container_name: discovery-server
+    ports:
+      - 8761:8761
+    environment:
+      APP_NAME: discovery-server
+      PORT: 8761
+    networks:
+      - crm-network
+
+  configuration-service:
+    build: ./configuration-service
+    container_name: configuration-service
+    ports:
+      - 8888:8888
+      - 8889:8889
+    environment:
+      APP_NAME: configuration-service
+      PORT: 8888
+      DEBUG_PORT: 8889
+      DISCOVERY_SERVER_URL: http://discovery-server:8761/eureka
+      CONFIG_FILES_DIRECTORY: https://github.com/rrastogi69556/ConfigurationFiles
+      SPRING.CLOUD.CONFIG.SERVER.GIT.URI: https://github.com/rrastogi69556/ConfigurationFiles
+      SPRING.CLOUD.CONFIG.DISCOVERY.ENABLED: "true"
+      SPRING.CLOUD.CONFIG.DISCOVERY.SERVICE-ID: configuration-service
+    networks:
+      - crm-network
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    ports:
+      - 8665:8665
+      - 8666:8666
+    environment:
+      APP_NAME: api-gateway
+      PORT: 8665
+      DEBUG_PORT: 8666
+      CONFIG_API_URL: http://configuration-service:8888
+      DISCOVERY_API_URL: http://discovery-server:8761/eureka
+      EUREKA.CLIENT.SERVICE-URL.DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING.CONFIG.IMPORT: optional:configserver:http://configuration-service:8888
+    depends_on:
+      - discovery-server
+      - configuration-service
+    networks:
+      - crm-network
+
+  pbx-integration-service:
+    build: ./pbx-integration-service
+    ports:
+      - 9901:9901
+      - 9900:9900
+    environment:
+      APP_NAME: pbx-integration-service
+      PORT: 9901
+      DEBUG_PORT: 9900
+      CONFIG_SERVER_API_URL: http://configuration-service:8888
+      PBX_EXCHANGE_URL: http://mock_pbx:3030
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka
+      SPRING.CONFIG.IMPORT: optional:configserver:http://configuration-service:8888
+    depends_on:
+      - discovery-server
+      - configuration-service
+    networks:
+      - crm-network
+
+  cdr-service:
+    build: ./cdr-service
+    container_name: cdr-service
+    ports:
+      - 8901:8901
+      - 8900:8900
+    environment:
+      APP_NAME: cdr-service
+      PORT: 8901
+      DEBUG_PORT: 8900
+      CONFIG_SERVER_API_URL: http://configuration-service:8888
+      DATABASE: POSTGRESQL
+      SPRING.DATASOURCE.URL: jdbc:postgresql://postgres-service:5432/postgres
+      DB_NAME: postgres
+      POSTGRES_PASSWORD: postgres
+      WEBHOOK_API_URL: http://pbx-integration-service:9901
+      PHONEBOOK_API_URL: http://phonebook-service:8501
+      CRON_SCHEDULER: "0 0 20 * * ?"
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka
+      EUREKA.CLIENT.SERVICE-URL.DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING.CONFIG.IMPORT: optional:configserver:http://configuration-service:8888
+    depends_on:
+      - discovery-server
+      - api-gateway
+      - postgres-service
+      - configuration-service
+    networks:
+      - crm-network
+
+  phonebook-service:
+    build: ./phonebook-service
+    container_name: phonebook-service
+    ports:
+      - 8501:8501
+      - 8500:8500
+    environment:
+      APP_NAME: phonebook-service
+      PORT: 8501
+      DEBUG_PORT: 8500
+      DATABASE: POSTGRESQL
+      DB_NAME: postgres
+      POSTGRES_PASSWORD: postgres
+      DISCOVERY_SERVER_URL: http://discovery-server:8761/eureka
+      CONFIG_SERVER_API_URL: http://configuration-service:8888
+      EUREKA.CLIENT.SERVICE-URL.DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING.CONFIG.IMPORT: optional:configserver:http://configuration-service:8888
+    depends_on:
+      - discovery-server
+      - api-gateway
+      - configuration-service
+    networks:
+      - crm-network
+
+networks:
+    crm-network:
