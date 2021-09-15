@@ -19,7 +19,7 @@ Below microservices are deployed in this system:
 - `mock-pbx`
     -   This microservice is the mock service emulating like the external pbx api which generates the call data records of the telephony exchange.
 - Checkout ConfigurationFiles from https://github.com/rrastogi69556/ConfigurationFiles.git
-- Checkout backend assignment from https://github.com/rrastogi69556/backend-assignment.git
+- Checkout backend mock server (external of PBX system) from https://github.com/rrastogi69556/backend-assignment.git
 
 Prerequisites, setup and run:
 -
